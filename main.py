@@ -9,7 +9,8 @@ DISPLAY_HEIGHT = 540
 
 FPS = 30
 
-SPEED = 5
+SPEED = 7
+SPEED_OF_BULLET = 5
 
 clock = pygame.time.Clock()
 
@@ -17,11 +18,18 @@ clock = pygame.time.Clock()
 display = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 pygame.display.set_caption('Z_Slayer')
 
-menubackground = pygame.image.load('menubackground.jpg').convert_alpha()
+pew_sound = pygame.mixer.Sound('sounds/pew.wav')
+
+menubackground = pygame.image.load('sprites/menubackground.jpg').convert_alpha()
 menubackground = pygame.transform.scale(menubackground, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
 
-Walkleft = [pygame.image.load("left_1.png").convert_alpha(), pygame.image.load("left_2.png").convert_alpha(), pygame.image.load("left_3.png").convert_alpha()]
-Walkright = [pygame.image.load("right_1.png").convert_alpha(), pygame.image.load("right_2.png").convert_alpha(), pygame.image.load("right_3.png").convert_alpha()]
+Walkleft = [pygame.image.load("sprites/left_1.png").convert_alpha(), pygame.image.load("sprites/left_2.png").convert_alpha(), pygame.image.load("sprites/left_3.png").convert_alpha()]
+Walkright = [pygame.image.load("sprites/right_1.png").convert_alpha(), pygame.image.load("sprites/right_2.png").convert_alpha(), pygame.image.load("sprites/right_3.png").convert_alpha()]
+
+Zombie_walkleft = [pygame.image.load("sprites/zombie_left_1.png").convert_alpha(), pygame.image.load("sprites/zombie_left_2.png").convert_alpha(),
+                   pygame.image.load("sprites/zombie_left_3.png").convert_alpha(), pygame.image.load("sprites/zombie_left_4.png").convert_alpha()]
+Zombie_walkright = [pygame.image.load("sprites/zombie_right_1.png").convert_alpha(), pygame.image.load("sprites/zombie_right_2.png").convert_alpha(),
+                   pygame.image.load("sprites/zombie_right_3.png").convert_alpha(), pygame.image.load("sprites/zombie_right_4.png").convert_alpha()]
 
 class Button:
     def __init__(self, width, height):
@@ -58,9 +66,6 @@ class Player:
         self.counter_for_frames_of_animation = 0
         self.counter_for_speed_of_animation = 0
         self.is_walking = False
-        self.aimPlayer()
-
-    def aimPlayer(self):
         self.rect = self.image.get_rect()
         self.rect.center = self.pivot
 
@@ -107,17 +112,61 @@ class Player:
         xDiff = mPos[0] - self.rect.centerx
         self.angle = math.atan2(yDiff, xDiff) * 180. / math.pi + 5
         self.first_pivot = self.pivot
-        self.aimPlayer()
+        self.rect.center = self.pivot
 
     def draw(self, display):
         display.blit(self.image, self.rect)
+
+class Shell(pygame.sprite.Sprite):
+
+    def __init__(self, Player):
+        super().__init__()
+        self.image = pygame.Surface((16, 16))
+        self.image.set_colorkey((0, 0, 0))
+        pygame.draw.circle(self.image, (255, 0, 0), (8, 8), 8)
+        self.rect = self.image.get_rect()
+
+        self.radAngle = math.pi * Player.angle / 180.
+
+        for i in range(3):
+            if Player.image == Walkright[i]:
+                self.rect.center = (Player.pivot[0] + Player.image.get_width() / 2, Player.pivot[1])
+                self.way = 1
+            if Player.image == Walkleft[i]:
+                self.rect.center = (Player.pivot[0] - Player.image.get_width() / 2, Player.pivot[1])
+                self.way = 0
+
+        self.dest = (self.rect.centerx + 1000 * math.cos(self.radAngle),
+                     self.rect.centery - 1000 * math.sin(self.radAngle))
+
+    def update(self):
+        dist = self.distApart(self.dest, self.rect.center)
+        if (dist < 5) or self.beyondWindow():
+            self.kill()
+        else:
+            for i in range(3):
+                if self.way == 1:
+                    self.rect = self.rect.move(SPEED_OF_BULLET, 0)
+                if self.way == 0:
+                    self.rect = self.rect.move(-SPEED_OF_BULLET, 0)
+
+
+    def beyondWindow(self):
+        xc = self.rect.centerx
+        yc = self.rect.centery
+        return (xc < 0) or (xc > DISPLAY_WIDTH - 1) or \
+               (yc < 0) or (yc > DISPLAY_HEIGHT - 1)
+
+    def distApart(self, pt1, pt2):
+        return math.sqrt((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2)
 
 def set_music(value, music):
     pass
 
 Player = Player()
+shells = pygame.sprite.Group()
 
-def print_text(message, x, y, font_color = (0, 0, 0), font_type = 'cosmic_font.ttf', font_size = 30):
+def print_text(message, x, y, font_color = (0, 0, 0), font_type = 'sprites/cosmic_font.ttf', font_size = 30):
     font_type = pygame.font.Font(font_type, font_size)
     text = font_type.render(message, True, font_color)
     display.blit(text, (x, y))
@@ -150,12 +199,18 @@ def menu_for_start():
 def start_game():
     global run
 
+    counter_b = 0
+    time_counter_b = 0
+    isPressed = False
+
     while run:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
                 pygame.quit()
                 quit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                isPressed = True
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             Player.movePlayer('l')
@@ -168,7 +223,36 @@ def start_game():
         display.fill((255, 255, 255))
         Player.update(pygame.mouse.get_pos())
 
+        #if isPressed == True:
+        #    if COUNTER_OF_BULLETS == 5 or len(shells.sprites()) == 5:
+        #        second_conter_of_bullets += 1
+        #    if COUNTER_OF_BULLETS < 5 or second_conter_of_bullets == 7:
+        #        if second_conter_of_bullets == 7:
+        #            second_conter_of_bullets = 0
+        #            COUNTER_OF_BULLETS = 0
+        #        COUNTER_OF_BULLETS += 1
+        #        pygame.mixer.Sound.play(pew_sound)
+        #        shells.add(Shell(Player))
+        #    isPressed = False
+
+#в общем, время, которое будет тратиться на перезарядку должно проходить не в isPressed
+        if isPressed == True:
+            if len(shells.sprites()) < 5:  # and time_counter_b % 10 == 0
+                pygame.mixer.Sound.play(pew_sound)
+                shells.add(Shell(Player))
+                counter_b += 1
+            #elif counter_b == 5 and time_counter_b % 10 != 0:
+            #    time_counter_b += 1
+            #    counter_b = time_counter_b // 2
+
+            isPressed = False
+        shells.update()
+
+        shells.draw(display)
+
         Player.draw(display)
+
+        print_text(str(5 - len(shells.sprites())) + " / 5", 0, 0)
 
         pygame.display.flip()
         clock.tick(FPS)
