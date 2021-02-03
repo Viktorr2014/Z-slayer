@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 
 pygame.init()
 pygame.mixer.init()
@@ -10,6 +11,7 @@ DISPLAY_HEIGHT = 540
 FPS = 30
 
 SPEED = 7
+SPEED_OF_SOMBIE = 6
 SPEED_OF_BULLET = 5
 
 clock = pygame.time.Clock()
@@ -65,7 +67,6 @@ class Player:
         self.angle = 0
         self.counter_for_frames_of_animation = 0
         self.counter_for_speed_of_animation = 0
-        self.is_walking = False
         self.rect = self.image.get_rect()
         self.rect.center = self.pivot
 
@@ -117,8 +118,75 @@ class Player:
     def draw(self, display):
         display.blit(self.image, self.rect)
 
-class Shell(pygame.sprite.Sprite):
 
+class Zombie(pygame.sprite.Sprite):
+    def __init__(self, Player):
+        super().__init__()
+        self.image = Zombie_walkleft[1]
+        if random.randint(0, 2) == 0:
+            self.pivot_x = 0
+        else:
+            self.pivot_x = DISPLAY_WIDTH
+        self.pivot_y = random.randint(0, DISPLAY_HEIGHT)
+        self.pivot = (self.pivot_x, self.pivot_y)
+        self.first_pivot = self.pivot
+        self.angle = 0
+        self.counter_for_frames_of_animation = 0
+        self.counter_for_speed_of_animation = 0
+        self.rect = self.image.get_rect()
+        self.rect.center = self.pivot
+
+    def moveZombie(self):
+        self.counter_for_speed_of_animation += 1
+        self.first_pivot = self.pivot
+        self.speed_of_zombie = SPEED_OF_SOMBIE + random.randint(-2, 3)
+        self.chance_of_moving = random.randint(1, 3)
+        if self.chance_of_moving == 2:
+            if self.pivot_x > Player.pivot_x:
+                self.pivot_x -= self.speed_of_zombie
+            if self.pivot_x < Player.pivot_x:
+                self.pivot_x += self.speed_of_zombie
+            if self.pivot_y > Player.pivot_y:
+                self.pivot_y -= self.speed_of_zombie // 2
+            if self.pivot_y < Player.pivot_y:
+                self.pivot_y += self.speed_of_zombie // 2
+
+    #    if (self.pivot_x, self.pivot_y) == self.pivot:
+     #       if -90 < self.angle < 90:
+      #          self.image = Zombie_walkright[1]
+       #        self.image = Zombie_walkleft[1]
+        else:
+            if -90 < self.angle < 90:
+                self.image = Zombie_walkright[int(self.counter_for_frames_of_animation)]
+            else:
+                self.image = Zombie_walkleft[int(self.counter_for_frames_of_animation)]
+        if self.counter_for_frames_of_animation < 3.85:
+            self.counter_for_frames_of_animation += 0.15
+        else:
+            self.counter_for_frames_of_animation = 0
+
+        self.rect.center = self.pivot
+        self.pivot = (self.pivot_x, self.pivot_y)
+        self.counter_for_speed_of_animation = 0
+
+    def update(self):
+        self.dist = math.sqrt(math.pow(Player.pivot_x - self.pivot_x, 2) + math.pow(Player.pivot_y - self.pivot_y, 2))
+        if self.dist < 50:
+            self.kill()
+        else:
+            self.moveZombie()
+         #   if self.pivot == self.first_pivot:
+          #      if -90 < self.angle < 90:
+           #         self.image = Zombie_walkright[1]
+            #    else:
+             #       self.image = Zombie_walkleft[1]
+            yDiff = self.rect.centery - Player.pivot_y
+            xDiff = Player.pivot_x - self.rect.centerx
+            self.angle = math.atan2(yDiff, xDiff) * 180. / math.pi + 5
+            self.first_pivot = self.pivot
+            self.rect.center = self.pivot
+
+class Shell(pygame.sprite.Sprite):
     def __init__(self, Player):
         super().__init__()
         self.image = pygame.Surface((16, 16))
@@ -165,6 +233,7 @@ def set_music(value, music):
 
 Player = Player()
 shells = pygame.sprite.Group()
+zombies = pygame.sprite.Group()
 
 def print_text(message, x, y, font_color = (0, 0, 0), font_type = 'sprites/cosmic_font.ttf', font_size = 30):
     font_type = pygame.font.Font(font_type, font_size)
@@ -211,6 +280,9 @@ def start_game():
                 quit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 isPressed = True
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_z:
+                    zombies.add(Zombie(Player))
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             Player.movePlayer('l')
@@ -248,7 +320,10 @@ def start_game():
             isPressed = False
         shells.update()
 
+        zombies.update()
+
         shells.draw(display)
+        zombies.draw(display)
 
         Player.draw(display)
 
