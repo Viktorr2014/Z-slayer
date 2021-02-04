@@ -10,8 +10,9 @@ DISPLAY_HEIGHT = 540
 
 FPS = 30
 
-SPEED = 7
-SPEED_OF_SOMBIE = 6
+SPEED = 5
+SUPER_SPEED = SPEED * 2
+SPEED_OF_ZOMBIE = 9
 SPEED_OF_BULLET = 5
 
 clock = pygame.time.Clock()
@@ -24,6 +25,9 @@ pew_sound = pygame.mixer.Sound('sounds/pew.wav')
 
 menubackground = pygame.image.load('sprites/menubackground.jpg').convert_alpha()
 menubackground = pygame.transform.scale(menubackground, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+
+gamebackground = pygame.image.load('sprites/gamebackground.png').convert_alpha()
+gamebackground = pygame.transform.scale(gamebackground, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
 
 Walkleft = [pygame.image.load("sprites/left_1.png").convert_alpha(), pygame.image.load("sprites/left_2.png").convert_alpha(), pygame.image.load("sprites/left_3.png").convert_alpha()]
 Walkright = [pygame.image.load("sprites/right_1.png").convert_alpha(), pygame.image.load("sprites/right_2.png").convert_alpha(), pygame.image.load("sprites/right_3.png").convert_alpha()]
@@ -69,22 +73,29 @@ class Player:
         self.counter_for_speed_of_animation = 0
         self.rect = self.image.get_rect()
         self.rect.center = self.pivot
+        self.damage = 20
+        self.kills = 0
+        self.hp = 200
+        self.counter_for_hp = 0
+        self.speed = SPEED
 
     def movePlayer(self, direction):
         self.counter_for_speed_of_animation += 1
         self.first_pivot = self.pivot
         if direction == 'l':
-            if self.pivot_x - SPEED - self.image.get_width() // 2 > 2:
-                self.pivot_x -= SPEED
+            if self.pivot_x - self.speed - self.image.get_width() // 2 > 2:
+                self.pivot_x -= self.speed
         if direction == 'r':
-            if self.pivot_x + SPEED + self.image.get_width() // 2 < DISPLAY_WIDTH - 2:
-                self.pivot_x += SPEED
+            if self.pivot_x + self.speed + self.image.get_width() // 2 < DISPLAY_WIDTH - 2:
+                self.pivot_x += self.speed
         if direction == 'u':
-            if self.pivot_y - SPEED - self.image.get_height() // 2 > 2:
-                self.pivot_y -= SPEED
+            if self.pivot_y - self.speed - self.image.get_height() // 2 > DISPLAY_HEIGHT // 4 + DISPLAY_HEIGHT // 20:
+                self.pivot_y -= self.speed
+            else:
+                self.pivot_y += 0.00000001
         if direction == 'd':
-            if self.pivot_y + SPEED + self.image.get_height() // 2 < DISPLAY_HEIGHT - 2:
-                self.pivot_y += SPEED
+            if self.pivot_y + self.speed + self.image.get_height() // 2 < DISPLAY_HEIGHT - 2:
+                self.pivot_y += self.speed
         if (self.pivot_x, self.pivot_y) == self.pivot:
             if -90 < self.angle < 90:
                 self.image = Walkright[1]
@@ -99,9 +110,14 @@ class Player:
             self.counter_for_frames_of_animation += 0.25
         else:
             self.counter_for_frames_of_animation = 0
-
         self.pivot = (self.pivot_x, self.pivot_y)
         self.counter_for_speed_of_animation = 0
+
+    def shift(self, isready_for_super_speed):
+        if isready_for_super_speed:
+            self.speed = SUPER_SPEED
+        else:
+            self.speed = SPEED
 
     def update(self, mPos):
         if self.pivot == self.first_pivot:
@@ -115,9 +131,17 @@ class Player:
         self.first_pivot = self.pivot
         self.rect.center = self.pivot
 
+        for zomb in zombies:
+            if math.fabs(self.rect.centerx - zomb.pivot_x) < 20:
+                if self.counter_for_hp % 15 == 0:
+                    self.hp -= 30
+                self.counter_for_hp += 1
+
+        if self.hp < 1:
+            game_over(True)
+
     def draw(self, display):
         display.blit(self.image, self.rect)
-
 
 class Zombie(pygame.sprite.Sprite):
     def __init__(self, Player):
@@ -127,7 +151,7 @@ class Zombie(pygame.sprite.Sprite):
             self.pivot_x = 0
         else:
             self.pivot_x = DISPLAY_WIDTH
-        self.pivot_y = random.randint(0, DISPLAY_HEIGHT)
+        self.pivot_y = random.randint(DISPLAY_HEIGHT - DISPLAY_HEIGHT // 4 - DISPLAY_HEIGHT // 10, DISPLAY_HEIGHT - DISPLAY_HEIGHT // 4 + DISPLAY_HEIGHT // 20)
         self.pivot = (self.pivot_x, self.pivot_y)
         self.first_pivot = self.pivot
         self.angle = 0
@@ -135,11 +159,12 @@ class Zombie(pygame.sprite.Sprite):
         self.counter_for_speed_of_animation = 0
         self.rect = self.image.get_rect()
         self.rect.center = self.pivot
+        self.hp = 100
 
     def moveZombie(self):
         self.counter_for_speed_of_animation += 1
         self.first_pivot = self.pivot
-        self.speed_of_zombie = SPEED_OF_SOMBIE + random.randint(-2, 3)
+        self.speed_of_zombie = SPEED_OF_ZOMBIE + random.randint(-2, 3)
         self.chance_of_moving = random.randint(1, 3)
         if self.chance_of_moving == 2:
             if self.pivot_x > Player.pivot_x:
@@ -150,11 +175,6 @@ class Zombie(pygame.sprite.Sprite):
                 self.pivot_y -= self.speed_of_zombie // 2
             if self.pivot_y < Player.pivot_y:
                 self.pivot_y += self.speed_of_zombie // 2
-
-    #    if (self.pivot_x, self.pivot_y) == self.pivot:
-     #       if -90 < self.angle < 90:
-      #          self.image = Zombie_walkright[1]
-       #        self.image = Zombie_walkleft[1]
         else:
             if -90 < self.angle < 90:
                 self.image = Zombie_walkright[int(self.counter_for_frames_of_animation)]
@@ -169,22 +189,23 @@ class Zombie(pygame.sprite.Sprite):
         self.pivot = (self.pivot_x, self.pivot_y)
         self.counter_for_speed_of_animation = 0
 
+    def got_shot(self):
+        self.hp -= random.randint(Player.damage - 3, Player.damage)
+
     def update(self):
         self.dist = math.sqrt(math.pow(Player.pivot_x - self.pivot_x, 2) + math.pow(Player.pivot_y - self.pivot_y, 2))
-        if self.dist < 50:
+        if self.hp < 1:
+            Player.kills += 1
+            Player.damage += 1
             self.kill()
         else:
             self.moveZombie()
-         #   if self.pivot == self.first_pivot:
-          #      if -90 < self.angle < 90:
-           #         self.image = Zombie_walkright[1]
-            #    else:
-             #       self.image = Zombie_walkleft[1]
             yDiff = self.rect.centery - Player.pivot_y
             xDiff = Player.pivot_x - self.rect.centerx
             self.angle = math.atan2(yDiff, xDiff) * 180. / math.pi + 5
             self.first_pivot = self.pivot
             self.rect.center = self.pivot
+            print_text(str(self.hp) + "/100", self.pivot_x - self.image.get_width() // 2, self.pivot_y - self.image.get_height() // 2 - 25, font_color = (255, 0, 0), font_size = 20)
 
 class Shell(pygame.sprite.Sprite):
     def __init__(self, Player):
@@ -209,8 +230,12 @@ class Shell(pygame.sprite.Sprite):
 
     def update(self):
         dist = self.distApart(self.dest, self.rect.center)
+        for zomb in zombies:
+            if math.fabs(self.rect.centerx - zomb.pivot_x) < 20:
+                zomb.got_shot()
+                self.kill()
         if (dist < 5) or self.beyondWindow():
-            self.kill()
+                self.kill()
         else:
             for i in range(3):
                 if self.way == 1:
@@ -243,6 +268,8 @@ def print_text(message, x, y, font_color = (0, 0, 0), font_type = 'sprites/cosmi
 def quit_game():
     global run
     run = False
+    pygame.quit()
+    quit()
 def menu_for_start():
     global run
     run = True
@@ -264,6 +291,26 @@ def menu_for_start():
 
         pygame.display.flip()
         clock.tick(FPS)
+def game_over(isover):
+    if isover:
+        global run
+        run = True
+
+        button_for_quit = Button(DISPLAY_WIDTH // 3 + DISPLAY_WIDTH // 28, DISPLAY_HEIGHT // 6)
+
+        while run:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                    pygame.quit()
+                    quit()
+            display.blit(menubackground, (0, 0))
+            print_text("Game over", DISPLAY_WIDTH // 4, 0, font_color=(255, 0, 0), font_size=80)
+            button_for_quit.draw(DISPLAY_WIDTH // 3, DISPLAY_HEIGHT - DISPLAY_HEIGHT // 3, 'Quit', quit_game, 40)
+
+            pygame.display.flip()
+            clock.tick(FPS)
+
 
 def start_game():
     global run
@@ -271,6 +318,11 @@ def start_game():
     counter_b = 0
     time_counter_b = 0
     isPressed = False
+    isshiftPressed = False
+    is_ready_for_super_speed = False
+    counter_for_super_speed = 0
+    counter_for_time_of_super_speed = 0
+    counter_for_spawn_of_zombies = 0
 
     while run:
         for event in pygame.event.get():
@@ -283,6 +335,7 @@ def start_game():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_z:
                     zombies.add(Zombie(Player))
+        game_over(False)
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             Player.movePlayer('l')
@@ -292,32 +345,48 @@ def start_game():
             Player.movePlayer('u')
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             Player.movePlayer('d')
-        display.fill((255, 255, 255))
+        if keys[pygame.K_LSHIFT]:
+            Player.shift(is_ready_for_super_speed)
+            isshiftPressed = True
+        display.blit(gamebackground, (0, 0))
         Player.update(pygame.mouse.get_pos())
 
-        #if isPressed == True:
-        #    if COUNTER_OF_BULLETS == 5 or len(shells.sprites()) == 5:
-        #        second_conter_of_bullets += 1
-        #    if COUNTER_OF_BULLETS < 5 or second_conter_of_bullets == 7:
-        #        if second_conter_of_bullets == 7:
-        #            second_conter_of_bullets = 0
-        #            COUNTER_OF_BULLETS = 0
-        #        COUNTER_OF_BULLETS += 1
-        #        pygame.mixer.Sound.play(pew_sound)
-        #        shells.add(Shell(Player))
-        #    isPressed = False
+        if len(zombies) == 0:
+            for i in range(counter_for_spawn_of_zombies + 1):
+                zombies.add(Zombie(Player))
+            counter_for_spawn_of_zombies += 1
 
-#в общем, время, которое будет тратиться на перезарядку должно проходить не в isPressed
-        if isPressed == True:
-            if len(shells.sprites()) < 5:  # and time_counter_b % 10 == 0
-                pygame.mixer.Sound.play(pew_sound)
-                shells.add(Shell(Player))
-                counter_b += 1
-            #elif counter_b == 5 and time_counter_b % 10 != 0:
-            #    time_counter_b += 1
-            #    counter_b = time_counter_b // 2
 
-            isPressed = False
+        if counter_b > 6 and time_counter_b < FPS:
+            time_counter_b += 1
+        else:
+            if time_counter_b != 0:
+                counter_b = 0
+            time_counter_b = 0
+            if isPressed == True:
+                if len(shells.sprites()) < 7:
+                    pygame.mixer.Sound.play(pew_sound)
+                    shells.add(Shell(Player))
+                    counter_b += 1
+        isPressed = False
+
+        if counter_for_super_speed < 200:
+            counter_for_super_speed += 1
+        if counter_for_super_speed == 200 and isshiftPressed == True:
+            counter_for_super_speed = 0
+            counter_for_time_of_super_speed = 1
+
+        if counter_for_time_of_super_speed > 0:
+            counter_for_time_of_super_speed += 1
+            is_ready_for_super_speed = True
+            if counter_for_time_of_super_speed > FPS:
+                counter_for_time_of_super_speed = 0
+                is_ready_for_super_speed = False
+                Player.shift(False)
+                pass
+        isshiftPressed = False
+
+
         shells.update()
 
         zombies.update()
@@ -327,7 +396,8 @@ def start_game():
 
         Player.draw(display)
 
-        print_text(str(5 - len(shells.sprites())) + " / 5", 0, 0)
+        print_text("Hp: " + str(Player.hp) + "/200" + " | Ammo: " + str(7 - counter_b) + " / 7" + " | Damage: " + str(Player.damage) +
+                   " | Ready for super speed: " + str(counter_for_super_speed // 2) + "%", 0, 0, font_size = 24)
 
         pygame.display.flip()
         clock.tick(FPS)
