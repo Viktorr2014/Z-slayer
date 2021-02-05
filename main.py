@@ -21,13 +21,17 @@ clock = pygame.time.Clock()
 display = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 pygame.display.set_caption('Z_Slayer')
 
+music = pygame.mixer.music.load('sounds/music_short.wav')
+pygame.mixer.music.set_volume(0.2)
+pygame.mixer.music.play(10, 0)
+
 pew_sound = pygame.mixer.Sound('sounds/pew.wav')
+pew_sound.set_volume(0.4)
 
 menubackground = pygame.image.load('sprites/menubackground.jpg').convert_alpha()
 menubackground = pygame.transform.scale(menubackground, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
 
-gamebackground = pygame.image.load('sprites/gamebackground.png').convert_alpha()
-gamebackground = pygame.transform.scale(gamebackground, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+gamebackground = [pygame.image.load("sprites/backgorund_1.png").convert_alpha(), pygame.image.load("sprites/backgorund_2.png").convert_alpha(), pygame.image.load("sprites/backgorund_3.png").convert_alpha()]
 
 Walkleft = [pygame.image.load("sprites/left_1.png").convert_alpha(), pygame.image.load("sprites/left_2.png").convert_alpha(), pygame.image.load("sprites/left_3.png").convert_alpha()]
 Walkright = [pygame.image.load("sprites/right_1.png").convert_alpha(), pygame.image.load("sprites/right_2.png").convert_alpha(), pygame.image.load("sprites/right_3.png").convert_alpha()]
@@ -253,9 +257,6 @@ class Shell(pygame.sprite.Sprite):
     def distApart(self, pt1, pt2):
         return math.sqrt((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2)
 
-def set_music(value, music):
-    pass
-
 Player = Player()
 shells = pygame.sprite.Group()
 zombies = pygame.sprite.Group()
@@ -297,6 +298,7 @@ def game_over(isover):
         run = True
 
         button_for_quit = Button(DISPLAY_WIDTH // 3 + DISPLAY_WIDTH // 28, DISPLAY_HEIGHT // 6)
+        button_for_restart = Button(DISPLAY_WIDTH // 3 + DISPLAY_WIDTH // 28, DISPLAY_HEIGHT // 6)
 
         while run:
             for event in pygame.event.get():
@@ -306,7 +308,8 @@ def game_over(isover):
                     quit()
             display.blit(menubackground, (0, 0))
             print_text("Game over", DISPLAY_WIDTH // 4, 0, font_color=(255, 0, 0), font_size=80)
-            button_for_quit.draw(DISPLAY_WIDTH // 3, DISPLAY_HEIGHT - DISPLAY_HEIGHT // 3, 'Quit', quit_game, 40)
+            button_for_restart.draw((DISPLAY_WIDTH - DISPLAY_WIDTH // 3) // 2, (DISPLAY_HEIGHT - DISPLAY_HEIGHT // 6) // 5 * 3, 'Restart game', start_game, 40)
+            button_for_quit.draw((DISPLAY_WIDTH - DISPLAY_WIDTH // 3) // 2, (DISPLAY_HEIGHT - DISPLAY_HEIGHT // 6) // 5 * 4, 'Quit', quit_game, 50)
 
             pygame.display.flip()
             clock.tick(FPS)
@@ -314,7 +317,10 @@ def game_over(isover):
 
 def start_game():
     global run
-
+    global Player
+    music = pygame.mixer.music.load('sounds/music_long.wav')
+    pygame.mixer.music.set_volume(1)
+    pygame.mixer.music.play(10, 0)
     counter_b = 0
     time_counter_b = 0
     isPressed = False
@@ -323,6 +329,10 @@ def start_game():
     counter_for_super_speed = 0
     counter_for_time_of_super_speed = 0
     counter_for_spawn_of_zombies = 0
+    Player.hp = 200
+    Player.damage = 20
+    for zomb in zombies:
+        zomb.kill()
 
     while run:
         for event in pygame.event.get():
@@ -348,7 +358,7 @@ def start_game():
         if keys[pygame.K_LSHIFT]:
             Player.shift(is_ready_for_super_speed)
             isshiftPressed = True
-        display.blit(gamebackground, (0, 0))
+        display.blit(gamebackground[counter_for_spawn_of_zombies // 3], (0, 0))
         Player.update(pygame.mouse.get_pos())
 
         if len(zombies) == 0:
